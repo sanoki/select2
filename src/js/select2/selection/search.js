@@ -83,7 +83,9 @@ define([
         if ($previousChoice.length > 0) {
           var item = Utils.GetData($previousChoice[0], 'data');
 
-          self.searchRemoveChoice(item);
+          self.trigger('unselect', {
+            data: item
+          });
 
           evt.preventDefault();
         }
@@ -139,6 +141,11 @@ define([
 
         // Tabbing will be handled during the `keydown` phase
         if (key == KEYS.TAB) {
+          return;
+        }
+
+        //If item deletion
+        if(key === KEYS.BACKSPACE && self.$search.val() === '') {
           return;
         }
 
@@ -216,7 +223,7 @@ define([
     if (this.$search.attr('placeholder') !== '') {
       width = this.$selection.find('.select2-selection__rendered').innerWidth();
     } else {
-      var minimumWidth = this.$search.val().length + 1;
+      var minimumWidth = this.$search.val().length + 2;
 
       width = (minimumWidth * 0.75) + 'em';
     }

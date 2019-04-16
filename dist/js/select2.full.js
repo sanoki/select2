@@ -935,14 +935,18 @@ S2.define('select2/results',[
     return sorter(data);
   };
 
-  Results.prototype.highlightFirstItem = function () {
-    var $options = this.$results
-      .find('.select2-results__option[aria-selected]');
-
-    var $selected = $options.filter('[aria-selected=true]');
+  Results.prototype.highlightFirstItem = function() {
+    var $options = this.$results;
+    var $selected = [];
+    if(this.options.options.hideSelectedOptions) {
+      $options = $options.find('.select2-results__option').not('[aria-hidden="true"]');
+    } else {
+      $options = $options.find('.select2-results__option[aria-selected]');
+      $selected = $options.filter('[aria-selected=true]');
+    }
 
     // Check if there are any selected options
-    if ($selected.length > 0) {
+    if($selected.length > 0) {
       // If there are selected options, highlight the first
       $selected.first().trigger('mouseenter');
     } else {
@@ -976,8 +980,14 @@ S2.define('select2/results',[
         if ((item.element != null && item.element.selected) ||
             (item.element == null && $.inArray(id, selectedIds) > -1)) {
           $option.attr('aria-selected', 'true');
+          if(self.options.options.hideSelectedOptions) {
+            $option.attr('aria-hidden', 'true');
+          }
         } else {
           $option.attr('aria-selected', 'false');
+          if(self.options.options.hideSelectedOptions) {
+            $option.removeAttr('aria-hidden');
+          }       
         }
       });
 
@@ -1034,6 +1044,10 @@ S2.define('select2/results',[
       attrs.role = 'group';
       attrs['aria-label'] = data.text;
       delete attrs['aria-selected'];
+    }
+
+    if(data.css) {
+      option.classList.add(data.css);
     }
 
     for (var attr in attrs) {
@@ -1108,13 +1122,20 @@ S2.define('select2/results',[
       self.showLoading(params);
     });
 
-    container.on('select', function () {
+    container.on('select', function() {
       if (!container.isOpen()) {
         return;
       }
 
       self.setClasses();
-      self.highlightFirstItem();
+
+      if (self.options.get('scrollAfterSelect')) {
+        self.highlightFirstItem();
+      }
+      if(self.options.get('multiple')) {
+        container.dropdown._positionDropdown();
+        self.trigger('results:next', {});
+      }
     });
 
     container.on('unselect', function () {
@@ -1123,7 +1144,10 @@ S2.define('select2/results',[
       }
 
       self.setClasses();
-      self.highlightFirstItem();
+
+      if (self.options.get('scrollAfterSelect')) {
+        self.highlightFirstItem();
+      }
     });
 
     container.on('open', function () {
@@ -1152,7 +1176,7 @@ S2.define('select2/results',[
       $highlighted.trigger('mouseup');
     });
 
-    container.on('results:select', function () {
+    container.on('results:select', function(evt) {
       var $highlighted = self.getHighlightedResults();
 
       if ($highlighted.length === 0) {
@@ -1165,7 +1189,8 @@ S2.define('select2/results',[
         self.trigger('close', {});
       } else {
         self.trigger('select', {
-          data: data
+          data: data,
+          originalEvent: evt
         });
       }
     });
@@ -1177,13 +1202,17 @@ S2.define('select2/results',[
 
       var currentIndex = $options.index($highlighted);
 
-      // If we are already at te top, don't move further
+      // If we are already at the top, don't move further
       // If no options, currentIndex will be -1
       if (currentIndex <= 0) {
         return;
       }
 
       var nextIndex = currentIndex - 1;
+
+      while(nextIndex > 0 && $options.eq(nextIndex).attr('aria-hidden') === "true") {
+        nextIndex--;
+      }
 
       // If none are highlighted, highlight the first
       if ($highlighted.length === 0) {
@@ -1213,6 +1242,10 @@ S2.define('select2/results',[
       var currentIndex = $options.index($highlighted);
 
       var nextIndex = currentIndex + 1;
+
+      while($options.eq(nextIndex).attr('aria-hidden') === "true" && nextIndex < $options.length) {
+        nextIndex++;
+      }
 
       // If we are at the last option, stay there
       if (nextIndex >= $options.length) {
@@ -1471,10 +1504,6 @@ S2.define('select2/selection/base',[
       self.$selection.removeAttr('aria-owns');
 
       self.$selection.focus();
-      window.setTimeout(function () {
-        self.$selection.focus();
-      }, 0);
-
       self._detachCloseHandler(container);
     });
 
@@ -1678,7 +1707,11 @@ S2.define('select2/selection/multiple',[
 
     MultipleSelection.__super__.bind.apply(this, arguments);
 
-    this.$selection.on('click', function (evt) {
+    this.$selection.on('click', function(evt) {
+      //Prevent blinking dropdown on items deleting
+      if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice')) {
+        return;
+      }
       self.trigger('toggle', {
         originalEvent: evt
       });
@@ -1911,8 +1944,10 @@ S2.define('select2/selection/allowClear',[
       return;
     }
 
+    var removeAll = this.options.get('translations').get('removeAllItems');   
+
     var $remove = $(
-      '<span class="select2-selection__clear">' +
+      '<span class="select2-selection__clear" title="' + removeAll() +'">' +
         '&times;' +
       '</span>'
     );
@@ -2009,7 +2044,9 @@ S2.define('select2/selection/search',[
         if ($previousChoice.length > 0) {
           var item = Utils.GetData($previousChoice[0], 'data');
 
-          self.searchRemoveChoice(item);
+          self.trigger('unselect', {
+            data: item
+          });
 
           evt.preventDefault();
         }
@@ -2065,6 +2102,11 @@ S2.define('select2/selection/search',[
 
         // Tabbing will be handled during the `keydown` phase
         if (key == KEYS.TAB) {
+          return;
+        }
+
+        //If item deletion
+        if(key === KEYS.BACKSPACE && self.$search.val() === '') {
           return;
         }
 
@@ -2142,7 +2184,7 @@ S2.define('select2/selection/search',[
     if (this.$search.attr('placeholder') !== '') {
       width = this.$selection.find('.select2-selection__rendered').innerWidth();
     } else {
-      var minimumWidth = this.$search.val().length + 1;
+      var minimumWidth = this.$search.val().length + 2;
 
       width = (minimumWidth * 0.75) + 'em';
     }
@@ -2503,6 +2545,7 @@ S2.define('select2/diacritics',[
     '\u019F': 'O',
     '\uA74A': 'O',
     '\uA74C': 'O',
+    '\u0152': 'OE',
     '\u01A2': 'OI',
     '\uA74E': 'OO',
     '\u0222': 'OU',
@@ -2912,6 +2955,7 @@ S2.define('select2/diacritics',[
     '\uA74B': 'o',
     '\uA74D': 'o',
     '\u0275': 'o',
+    '\u0153': 'oe',
     '\u01A3': 'oi',
     '\u0223': 'ou',
     '\uA74F': 'oo',
@@ -3080,8 +3124,9 @@ S2.define('select2/diacritics',[
     '\u03CD': '\u03C5',
     '\u03CB': '\u03C5',
     '\u03B0': '\u03C5',
-    '\u03C9': '\u03C9',
-    '\u03C2': '\u03C3'
+    '\u03CE': '\u03C9',
+    '\u03C2': '\u03C3',
+    '\u2019': '\''
   };
 
   return diacritics;
@@ -3161,6 +3206,28 @@ S2.define('select2/data/select',[
     var self = this;
 
     data.selected = true;
+
+    if(data.root !== undefined) {
+      this.current(function(currentData) {
+        var val = [data.id];
+        var selectedData = data;
+        data = [data];
+        data.push.apply(data, currentData);
+
+        for(var d = 0; d < data.length; d++) {
+          var dataItem = data[d];
+          var id = data[d].id;
+
+          if(selectedData.root ? selectedData.group !== dataItem.text : dataItem.group !== selectedData.text && $.inArray(id, val) === -1) {
+            val.push(id);
+          }
+        }
+        self.$element.val(val);
+        self.$element.trigger('change');
+      });
+      return;
+    }
+
 
     // If data.element is a DOM node, use it instead
     if ($(data.element).is('option')) {
@@ -3978,7 +4045,7 @@ S2.define('select2/dropdown',[
   };
 
   Dropdown.prototype.position = function ($dropdown, $container) {
-    // Should be implmented in subclasses
+    // Should be implemented in subclasses
   };
 
   Dropdown.prototype.destroy = function () {
@@ -4383,10 +4450,10 @@ S2.define('select2/dropdown/attachBody',[
       top: container.bottom
     };
 
-    // Determine what the parent element is to use for calciulating the offset
+    // Determine what the parent element is to use for calculating the offset
     var $offsetParent = this.$dropdownParent;
 
-    // For statically positoned elements, we need to get the element
+    // For statically positioned elements, we need to get the element
     // that is determining the offset
     if ($offsetParent.css('position') === 'static') {
       $offsetParent = $offsetParent.offsetParent();
@@ -4552,10 +4619,6 @@ S2.define('select2/dropdown/closeOnSelect',[
     container.on('select', function (evt) {
       self._selectTriggered(evt);
     });
-
-    container.on('unselect', function (evt) {
-      self._selectTriggered(evt);
-    });
   };
 
   CloseOnSelect.prototype._selectTriggered = function (_, evt) {
@@ -4616,6 +4679,9 @@ S2.define('select2/i18n/en',[],function () {
     },
     searching: function () {
       return 'Searching…';
+    },
+    removeAllItems: function () {
+      return 'Remove all items';
     }
   };
 });
@@ -4987,6 +5053,7 @@ S2.define('select2/defaults',[
       maximumSelectionLength: 0,
       minimumResultsForSearch: 0,
       selectOnClose: false,
+      scrollAfterSelect: false,
       sorter: function (data) {
         return data;
       },
@@ -5420,6 +5487,35 @@ S2.define('select2/core',[
   Select2.prototype._registerEvents = function () {
     var self = this;
 
+    this.on('select', function() {
+      if(self.options.get('multiple')) {
+        self.trigger('focus', { originalEvent: {} });
+      }
+    });
+
+    this.on('unselect', function() {
+      if(self.options.get('multiple')) {
+        self.trigger('focus', { originalEvent: {} });
+        self.trigger('close', { originalEvent: {} });
+      }
+    });
+    
+    this.on('focus', function(evt) {
+      self.$container.addClass('select2-container--focus');
+
+      if(!self.$container.hasClass('select2-container--disabled') && !self.isOpen()) {
+        if(self.options.get('multiple')) {
+          if(!evt.originalEvent) {
+            window.setTimeout(function() {
+              self.open();
+            }, self.options.get('ajax') ? 300 : 100);
+          }
+        } else {
+          self.open();
+        }
+      }
+    });
+
     this.on('open', function () {
       self.$container.addClass('select2-container--open');
     });
@@ -5472,7 +5568,7 @@ S2.define('select2/core',[
 
           evt.preventDefault();
         } else if (key === KEYS.ENTER) {
-          self.trigger('results:select', {});
+          self.trigger('results:select', evt);
 
           evt.preventDefault();
         } else if ((key === KEYS.SPACE && evt.ctrlKey)) {

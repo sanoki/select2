@@ -11,10 +11,6 @@ define([
     container.on('select', function (evt) {
       self._selectTriggered(evt);
     });
-
-    container.on('unselect', function (evt) {
-      self._selectTriggered(evt);
-    });
   };
 
   CloseOnSelect.prototype._selectTriggered = function (_, evt) {

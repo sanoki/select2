@@ -26,7 +26,11 @@ define([
 
     MultipleSelection.__super__.bind.apply(this, arguments);
 
-    this.$selection.on('click', function (evt) {
+    this.$selection.on('click', function(evt) {
+      //Prevent blinking dropdown on items deleting
+      if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice')) {
+        return;
+      }
       self.trigger('toggle', {
         originalEvent: evt
       });

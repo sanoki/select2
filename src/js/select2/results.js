@@ -97,14 +97,18 @@ define([
     return sorter(data);
   };
 
-  Results.prototype.highlightFirstItem = function () {
-    var $options = this.$results
-      .find('.select2-results__option[aria-selected]');
-
-    var $selected = $options.filter('[aria-selected=true]');
+  Results.prototype.highlightFirstItem = function() {
+    var $options = this.$results;
+    var $selected = [];
+    if(this.options.options.hideSelectedOptions) {
+      $options = $options.find('.select2-results__option').not('[aria-hidden="true"]');
+    } else {
+      $options = $options.find('.select2-results__option[aria-selected]');
+      $selected = $options.filter('[aria-selected=true]');
+    }
 
     // Check if there are any selected options
-    if ($selected.length > 0) {
+    if($selected.length > 0) {
       // If there are selected options, highlight the first
       $selected.first().trigger('mouseenter');
     } else {
@@ -138,8 +142,14 @@ define([
         if ((item.element != null && item.element.selected) ||
             (item.element == null && $.inArray(id, selectedIds) > -1)) {
           $option.attr('aria-selected', 'true');
+          if(self.options.options.hideSelectedOptions) {
+            $option.attr('aria-hidden', 'true');
+          }
         } else {
           $option.attr('aria-selected', 'false');
+          if(self.options.options.hideSelectedOptions) {
+            $option.removeAttr('aria-hidden');
+          }       
         }
       });
 
@@ -196,6 +206,10 @@ define([
       attrs.role = 'group';
       attrs['aria-label'] = data.text;
       delete attrs['aria-selected'];
+    }
+
+    if(data.css) {
+      option.classList.add(data.css);
     }
 
     for (var attr in attrs) {
@@ -270,7 +284,7 @@ define([
       self.showLoading(params);
     });
 
-    container.on('select', function () {
+    container.on('select', function() {
       if (!container.isOpen()) {
         return;
       }
@@ -279,6 +293,10 @@ define([
 
       if (self.options.get('scrollAfterSelect')) {
         self.highlightFirstItem();
+      }
+      if(self.options.get('multiple')) {
+        container.dropdown._positionDropdown();
+        self.trigger('results:next', {});
       }
     });
 
@@ -320,7 +338,7 @@ define([
       $highlighted.trigger('mouseup');
     });
 
-    container.on('results:select', function () {
+    container.on('results:select', function(evt) {
       var $highlighted = self.getHighlightedResults();
 
       if ($highlighted.length === 0) {
@@ -333,7 +351,8 @@ define([
         self.trigger('close', {});
       } else {
         self.trigger('select', {
-          data: data
+          data: data,
+          originalEvent: evt
         });
       }
     });
@@ -352,6 +371,10 @@ define([
       }
 
       var nextIndex = currentIndex - 1;
+
+      while(nextIndex > 0 && $options.eq(nextIndex).attr('aria-hidden') === "true") {
+        nextIndex--;
+      }
 
       // If none are highlighted, highlight the first
       if ($highlighted.length === 0) {
@@ -381,6 +404,10 @@ define([
       var currentIndex = $options.index($highlighted);
 
       var nextIndex = currentIndex + 1;
+
+      while($options.eq(nextIndex).attr('aria-hidden') === "true" && nextIndex < $options.length) {
+        nextIndex++;
+      }
 
       // If we are at the last option, stay there
       if (nextIndex >= $options.length) {

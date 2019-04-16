@@ -276,19 +276,31 @@ define([
 
   Select2.prototype._registerEvents = function () {
     var self = this;
+
+    this.on('select', function() {
+      if(self.options.get('multiple')) {
+        self.trigger('focus', { originalEvent: {} });
+      }
+    });
+
+    this.on('unselect', function() {
+      if(self.options.get('multiple')) {
+        self.trigger('focus', { originalEvent: {} });
+        self.trigger('close', { originalEvent: {} });
+      }
+    });
     
-    this.on('focus', function () {
+    this.on('focus', function(evt) {
       self.$container.addClass('select2-container--focus');
 
-      if (!self.$container.hasClass('select2-container--disabled') &&
-          !self.isOpen()) {
-        if (self.options.get('multiple')) {
-          window.setTimeout(function () {
-            self.open();
-          },
-          self.options.get('ajax') ? 300 : 100);
-        }
-        else {
+      if(!self.$container.hasClass('select2-container--disabled') && !self.isOpen()) {
+        if(self.options.get('multiple')) {
+          if(!evt.originalEvent) {
+            window.setTimeout(function() {
+              self.open();
+            }, self.options.get('ajax') ? 300 : 100);
+          }
+        } else {
           self.open();
         }
       }
@@ -346,7 +358,7 @@ define([
 
           evt.preventDefault();
         } else if (key === KEYS.ENTER) {
-          self.trigger('results:select', {});
+          self.trigger('results:select', evt);
 
           evt.preventDefault();
         } else if ((key === KEYS.SPACE && evt.ctrlKey)) {

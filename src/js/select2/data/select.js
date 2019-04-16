@@ -32,6 +32,28 @@ define([
 
     data.selected = true;
 
+    if(data.root !== undefined) {
+      this.current(function(currentData) {
+        var val = [data.id];
+        var selectedData = data;
+        data = [data];
+        data.push.apply(data, currentData);
+
+        for(var d = 0; d < data.length; d++) {
+          var dataItem = data[d];
+          var id = data[d].id;
+
+          if(selectedData.root ? selectedData.group !== dataItem.text : dataItem.group !== selectedData.text && $.inArray(id, val) === -1) {
+            val.push(id);
+          }
+        }
+        self.$element.val(val);
+        self.$element.trigger('change');
+      });
+      return;
+    }
+
+
     // If data.element is a DOM node, use it instead
     if ($(data.element).is('option')) {
       data.element.selected = true;

@@ -2029,13 +2029,17 @@ S2.define('select2/selection/search',[
     });
 
     this.$selection.on('keydown', '.select2-search--inline', function (evt) {
+      var key = evt.which;
+
+      if(key === KEYS.ESC && !container.isOpen()) {
+        return;
+      }
+
       evt.stopPropagation();
 
       self.trigger('keypress', evt);
 
       self._keyUpPrevented = evt.isDefaultPrevented();
-
-      var key = evt.which;
 
       if (key === KEYS.BACKSPACE && self.$search.val() === '') {
         var $previousChoice = self.$searchContainer

@@ -1,7 +1,8 @@
 define([
   'jquery',
-  '../utils'
-], function ($, Utils) {
+  '../utils',
+  '../keys'
+], function ($, Utils, KEYS) {
   function Search () { }
 
   Search.prototype.render = function (decorated) {
@@ -44,6 +45,36 @@ define([
 
     this.$search.on('keyup input', function (evt) {
       self.handleSearch(evt);
+    });
+
+    this.$search.on('keydown', function(evt) {
+      var key = evt.which;
+
+      if(key === KEYS.ESC) {
+        evt.stopPropagation();
+        return;
+      }
+
+      evt.stopPropagation();
+
+      self._keyUpPrevented = evt.isDefaultPrevented();
+
+      if(key === KEYS.BACKSPACE && self.$search.val() === '') {
+        var $previousChoice = self.$container
+          .find('.select2-selection__choice').last();
+
+        if($previousChoice.length > 0) {
+          var item = Utils.GetData($previousChoice[0], 'data');
+
+          self.trigger('unselect', {
+            data: item
+          });
+
+          evt.preventDefault();
+
+          self.trigger('focus');
+        }
+      }
     });
 
     container.on('open', function () {

@@ -8,7 +8,6 @@ define([
   './selection/multiple',
   './selection/placeholder',
   './selection/allowClear',
-  './selection/search',
   './selection/eventRelay',
 
   './utils',
@@ -38,8 +37,7 @@ define([
 
              ResultsList,
 
-             SingleSelection, MultipleSelection, Placeholder, AllowClear,
-             SelectionSearch, EventRelay,
+             SingleSelection, MultipleSelection, Placeholder, AllowClear, EventRelay,
 
              Utils, Translation, DIACRITICS,
 
@@ -143,13 +141,7 @@ define([
     }
 
     if (options.dropdownAdapter == null) {
-      if (options.multiple) {
-        options.dropdownAdapter = Dropdown;
-      } else {
-        var SearchableDropdown = Utils.Decorate(Dropdown, DropdownSearch);
-
-        options.dropdownAdapter = SearchableDropdown;
-      }
+      options.dropdownAdapter = Utils.Decorate(Dropdown, DropdownSearch);
 
       if (options.minimumResultsForSearch !== 0) {
         options.dropdownAdapter = Utils.Decorate(
@@ -203,13 +195,6 @@ define([
         options.selectionAdapter = Utils.Decorate(
           options.selectionAdapter,
           AllowClear
-        );
-      }
-
-      if (options.multiple) {
-        options.selectionAdapter = Utils.Decorate(
-          options.selectionAdapter,
-          SelectionSearch
         );
       }
 

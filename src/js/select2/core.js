@@ -292,18 +292,7 @@ define([
     
     this.on('focus', function(evt) {
       self.$container.addClass('select2-container--focus');
-
-      if(!self.$container.hasClass('select2-container--disabled') && !self.isOpen()) {
-        if(self.options.get('multiple')) {
-          if(!evt.originalEvent) {
-            window.setTimeout(function() {
-              self.open();
-            }, self.options.get('ajax') ? 300 : 100);
-          }
-        } else {
-          self.open();
-        }
-      }
+      self.open();
     });
 
     this.on('open', function () {
@@ -348,37 +337,39 @@ define([
       });
     });
 
-    this.on('keypress', function (evt) {
+    this.on('keypress', function(evt) {
       var key = evt.which;
+      var keyStr = evt.key;
 
-      if (self.isOpen()) {
-        if (key === KEYS.ESC || key === KEYS.TAB ||
-            (key === KEYS.UP && evt.altKey)) {
+      if(self.isOpen()) {
+        if(key === KEYS.ESC || key === KEYS.TAB ||
+          (key === KEYS.UP && evt.altKey)) {
           self.close();
 
           evt.preventDefault();
-        } else if (key === KEYS.ENTER) {
+        } else if(key === KEYS.ENTER) {
           self.trigger('results:select', evt);
 
           evt.preventDefault();
-        } else if ((key === KEYS.SPACE && evt.ctrlKey)) {
+        } else if((key === KEYS.SPACE && evt.ctrlKey)) {
           self.trigger('results:toggle', {});
 
           evt.preventDefault();
-        } else if (key === KEYS.UP) {
+        } else if(key === KEYS.UP) {
           self.trigger('results:previous', {});
 
           evt.preventDefault();
-        } else if (key === KEYS.DOWN) {
+        } else if(key === KEYS.DOWN) {
           self.trigger('results:next', {});
 
           evt.preventDefault();
         }
       } else {
-        if (key === KEYS.ENTER || key === KEYS.SPACE ||
-            (key === KEYS.DOWN && evt.altKey)) {
+        if(key === KEYS.ENTER || key === KEYS.SPACE || keyStr.length === 1) {
           self.open();
-
+          if(self.dropdown.$search && keyStr.length === 1) {
+            self.dropdown.$search.val(keyStr);
+          }
           evt.preventDefault();
         }
       }

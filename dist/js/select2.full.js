@@ -1682,8 +1682,9 @@ S2.define('select2/selection/single',[
 S2.define('select2/selection/multiple',[
   'jquery',
   './base',
-  '../utils'
-], function ($, BaseSelection, Utils) {
+  '../utils',
+  '../keys'
+], function ($, BaseSelection, Utils, KYES) {
   function MultipleSelection ($element, options) {
     MultipleSelection.__super__.constructor.apply(this, arguments);
   }
@@ -1707,20 +1708,17 @@ S2.define('select2/selection/multiple',[
 
     MultipleSelection.__super__.bind.apply(this, arguments);
 
-    this.$selection.on('keydown', function(evt) {
+    this.$selection.on('click', function(evt) {
       //Prevent blinking dropdown on items deleting
       if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice')) {
         return;
       }
-      self.trigger('toggle', {
+      self.trigger('open', {
         originalEvent: evt
       });
     });
 
-    this.$selection.on(
-      'click',
-      '.select2-selection__choice__remove',
-      function (evt) {
+    this.$selection.on('click', '.select2-selection__choice__remove', function (evt) {
         // Ignore the event if it is disabled
         if (self.options.get('disabled')) {
           return;
@@ -1735,8 +1733,25 @@ S2.define('select2/selection/multiple',[
           originalEvent: evt,
           data: data
         });
+    });
+
+    this.$selection.on('keydown', function(evt) {
+      var key = evt.which;
+
+      if(key === KEYS.BACKSPACE) {
+        var $previousChoice = $container.find('.select2-selection__choice').last();
+
+        if($previousChoice.length > 0) {
+          var item = Utils.GetData($previousChoice[0], 'data');
+
+          self.trigger('unselect', {
+            data: item
+          });
+
+          evt.preventDefault();
+        }
       }
-    );
+    });
   };
 
   MultipleSelection.prototype.clear = function () {
@@ -1957,246 +1972,6 @@ S2.define('select2/selection/allowClear',[
   };
 
   return AllowClear;
-});
-
-S2.define('select2/selection/search',[
-  'jquery',
-  '../utils',
-  '../keys'
-], function ($, Utils, KEYS) {
-  function Search (decorated, $element, options) {
-    decorated.call(this, $element, options);
-  }
-
-  Search.prototype.render = function (decorated) {
-    var $search = $(
-      '<li class="select2-search select2-search--inline">' +
-        '<input class="select2-search__field" type="search" tabindex="-1"' +
-        ' autocomplete="off" autocorrect="off" autocapitalize="none"' +
-        ' spellcheck="false" role="textbox" aria-autocomplete="list" />' +
-      '</li>'
-    );
-
-    this.$searchContainer = $search;
-    this.$search = $search.find('input');
-
-    var $rendered = decorated.call(this);
-
-    this._transferTabIndex();
-
-    return $rendered;
-  };
-
-  Search.prototype.bind = function (decorated, container, $container) {
-    var self = this;
-
-    decorated.call(this, container, $container);
-
-    container.on('open', function () {
-      self.$search.trigger('focus');
-    });
-
-    container.on('close', function () {
-      self.$search.val('');
-      self.$search.removeAttr('aria-activedescendant');
-      self.$search.trigger('focus');
-    });
-
-    container.on('enable', function () {
-      self.$search.prop('disabled', false);
-
-      self._transferTabIndex();
-    });
-
-    container.on('disable', function () {
-      self.$search.prop('disabled', true);
-    });
-
-    container.on('focus', function (evt) {
-      self.$search.trigger('focus');
-    });
-
-    container.on('results:focus', function (params) {
-      self.$search.attr('aria-activedescendant', params.id);
-    });
-
-    this.$selection.on('focusin', '.select2-search--inline', function (evt) {
-      self.trigger('focus', evt);
-    });
-
-    this.$selection.on('focusout', '.select2-search--inline', function (evt) {
-      self._handleBlur(evt);
-    });
-
-    this.$selection.on('keydown', '.select2-search--inline', function (evt) {
-      var key = evt.which;
-
-      if(key === KEYS.ESC && !container.isOpen()) {
-        return;
-      }
-
-      evt.stopPropagation();
-
-      self.trigger('keypress', evt);
-
-      self._keyUpPrevented = evt.isDefaultPrevented();
-
-      if (key === KEYS.BACKSPACE && self.$search.val() === '') {
-        var $previousChoice = self.$searchContainer
-          .prev('.select2-selection__choice');
-
-        if ($previousChoice.length > 0) {
-          var item = Utils.GetData($previousChoice[0], 'data');
-
-          self.trigger('unselect', {
-            data: item
-          });
-
-          evt.preventDefault();
-        }
-      }
-    });
-
-    // Try to detect the IE version should the `documentMode` property that
-    // is stored on the document. This is only implemented in IE and is
-    // slightly cleaner than doing a user agent check.
-    // This property is not available in Edge, but Edge also doesn't have
-    // this bug.
-    var msie = document.documentMode;
-    var disableInputEvents = msie && msie <= 11;
-
-    // Workaround for browsers which do not support the `input` event
-    // This will prevent double-triggering of events for browsers which support
-    // both the `keyup` and `input` events.
-    this.$selection.on(
-      'input.searchcheck',
-      '.select2-search--inline',
-      function (evt) {
-        // IE will trigger the `input` event when a placeholder is used on a
-        // search box. To get around this issue, we are forced to ignore all
-        // `input` events in IE and keep using `keyup`.
-        if (disableInputEvents) {
-          self.$selection.off('input.search input.searchcheck');
-          return;
-        }
-
-        // Unbind the duplicated `keyup` event
-        self.$selection.off('keyup.search');
-      }
-    );
-
-    this.$selection.on(
-      'keyup.search input.search',
-      '.select2-search--inline',
-      function (evt) {
-        // IE will trigger the `input` event when a placeholder is used on a
-        // search box. To get around this issue, we are forced to ignore all
-        // `input` events in IE and keep using `keyup`.
-        if (disableInputEvents && evt.type === 'input') {
-          self.$selection.off('input.search input.searchcheck');
-          return;
-        }
-
-        var key = evt.which;
-
-        // We can freely ignore events from modifier keys
-        if (key == KEYS.SHIFT || key == KEYS.CTRL || key == KEYS.ALT) {
-          return;
-        }
-
-        // Tabbing will be handled during the `keydown` phase
-        if (key == KEYS.TAB) {
-          return;
-        }
-
-        //If item deletion
-        if(key === KEYS.BACKSPACE && self.$search.val() === '') {
-          return;
-        }
-
-        self.handleSearch(evt);
-      }
-    );
-  };
-
-  /**
-   * This method will transfer the tabindex attribute from the rendered
-   * selection to the search box. This allows for the search box to be used as
-   * the primary focus instead of the selection container.
-   *
-   * @private
-   */
-  Search.prototype._transferTabIndex = function (decorated) {
-    this.$search.attr('tabindex', this.$selection.attr('tabindex'));
-    this.$selection.attr('tabindex', '-1');
-  };
-
-  Search.prototype.createPlaceholder = function (decorated, placeholder) {
-    this.$search.attr('placeholder', placeholder.text);
-  };
-
-  Search.prototype.update = function (decorated, data) {
-    var searchHadFocus = this.$search[0] == document.activeElement;
-
-    this.$search.attr('placeholder', '');
-
-    decorated.call(this, data);
-
-    this.$selection.find('.select2-selection__rendered')
-                   .append(this.$searchContainer);
-
-    this.resizeSearch();
-    if (searchHadFocus) {
-      var isTagInput = this.$element.find('[data-select2-tag]').length;
-      if (isTagInput) {
-        // fix IE11 bug where tag input lost focus
-        this.$element.focus();
-      } else {
-        this.$search.focus();
-      }
-    }
-  };
-
-  Search.prototype.handleSearch = function () {
-    this.resizeSearch();
-
-    if (!this._keyUpPrevented) {
-      var input = this.$search.val();
-
-      this.trigger('query', {
-        term: input
-      });
-    }
-
-    this._keyUpPrevented = false;
-  };
-
-  Search.prototype.searchRemoveChoice = function (decorated, item) {
-    this.trigger('unselect', {
-      data: item
-    });
-
-    this.$search.val(item.text);
-    this.handleSearch();
-  };
-
-  Search.prototype.resizeSearch = function () {
-    this.$search.css('width', '25px');
-
-    var width = '';
-
-    if (this.$search.attr('placeholder') !== '') {
-      width = this.$selection.find('.select2-selection__rendered').innerWidth();
-    } else {
-      var minimumWidth = this.$search.val().length + 2;
-
-      width = (minimumWidth * 0.75) + 'em';
-    }
-
-    this.$search.css('width', width);
-  };
-
-  return Search;
 });
 
 S2.define('select2/selection/eventRelay',[
@@ -4062,8 +3837,9 @@ S2.define('select2/dropdown',[
 
 S2.define('select2/dropdown/search',[
   'jquery',
-  '../utils'
-], function ($, Utils) {
+  '../utils',
+  '../keys'
+], function ($, Utils, KEYS) {
   function Search () { }
 
   Search.prototype.render = function (decorated) {
@@ -4106,6 +3882,36 @@ S2.define('select2/dropdown/search',[
 
     this.$search.on('keyup input', function (evt) {
       self.handleSearch(evt);
+    });
+
+    this.$search.on('keydown', function(evt) {
+      var key = evt.which;
+
+      if(key === KEYS.ESC) {
+        evt.stopPropagation();
+        return;
+      }
+
+      evt.stopPropagation();
+
+      self._keyUpPrevented = evt.isDefaultPrevented();
+
+      if(key === KEYS.BACKSPACE && self.$search.val() === '') {
+        var $previousChoice = self.$container
+          .find('.select2-selection__choice').last();
+
+        if($previousChoice.length > 0) {
+          var item = Utils.GetData($previousChoice[0], 'data');
+
+          self.trigger('unselect', {
+            data: item
+          });
+
+          evt.preventDefault();
+
+          self.trigger('focus');
+        }
+      }
     });
 
     container.on('open', function () {
@@ -4700,7 +4506,6 @@ S2.define('select2/defaults',[
   './selection/multiple',
   './selection/placeholder',
   './selection/allowClear',
-  './selection/search',
   './selection/eventRelay',
 
   './utils',
@@ -4730,8 +4535,7 @@ S2.define('select2/defaults',[
 
              ResultsList,
 
-             SingleSelection, MultipleSelection, Placeholder, AllowClear,
-             SelectionSearch, EventRelay,
+             SingleSelection, MultipleSelection, Placeholder, AllowClear, EventRelay,
 
              Utils, Translation, DIACRITICS,
 
@@ -4835,13 +4639,7 @@ S2.define('select2/defaults',[
     }
 
     if (options.dropdownAdapter == null) {
-      if (options.multiple) {
-        options.dropdownAdapter = Dropdown;
-      } else {
-        var SearchableDropdown = Utils.Decorate(Dropdown, DropdownSearch);
-
-        options.dropdownAdapter = SearchableDropdown;
-      }
+      options.dropdownAdapter = Utils.Decorate(Dropdown, DropdownSearch);
 
       if (options.minimumResultsForSearch !== 0) {
         options.dropdownAdapter = Utils.Decorate(
@@ -4895,13 +4693,6 @@ S2.define('select2/defaults',[
         options.selectionAdapter = Utils.Decorate(
           options.selectionAdapter,
           AllowClear
-        );
-      }
-
-      if (options.multiple) {
-        options.selectionAdapter = Utils.Decorate(
-          options.selectionAdapter,
-          SelectionSearch
         );
       }
 
@@ -5506,18 +5297,7 @@ S2.define('select2/core',[
     
     this.on('focus', function(evt) {
       self.$container.addClass('select2-container--focus');
-
-      if(!self.$container.hasClass('select2-container--disabled') && !self.isOpen()) {
-        if(self.options.get('multiple')) {
-          if(!evt.originalEvent) {
-            window.setTimeout(function() {
-              self.open();
-            }, self.options.get('ajax') ? 300 : 100);
-          }
-        } else {
-          self.open();
-        }
-      }
+      self.open();
     });
 
     this.on('open', function () {
@@ -5562,37 +5342,39 @@ S2.define('select2/core',[
       });
     });
 
-    this.on('keypress', function (evt) {
+    this.on('keypress', function(evt) {
       var key = evt.which;
+      var keyStr = evt.key;
 
-      if (self.isOpen()) {
-        if (key === KEYS.ESC || key === KEYS.TAB ||
-            (key === KEYS.UP && evt.altKey)) {
+      if(self.isOpen()) {
+        if(key === KEYS.ESC || key === KEYS.TAB ||
+          (key === KEYS.UP && evt.altKey)) {
           self.close();
 
           evt.preventDefault();
-        } else if (key === KEYS.ENTER) {
+        } else if(key === KEYS.ENTER) {
           self.trigger('results:select', evt);
 
           evt.preventDefault();
-        } else if ((key === KEYS.SPACE && evt.ctrlKey)) {
+        } else if((key === KEYS.SPACE && evt.ctrlKey)) {
           self.trigger('results:toggle', {});
 
           evt.preventDefault();
-        } else if (key === KEYS.UP) {
+        } else if(key === KEYS.UP) {
           self.trigger('results:previous', {});
 
           evt.preventDefault();
-        } else if (key === KEYS.DOWN) {
+        } else if(key === KEYS.DOWN) {
           self.trigger('results:next', {});
 
           evt.preventDefault();
         }
       } else {
-        if (key === KEYS.ENTER || key === KEYS.SPACE ||
-            (key === KEYS.DOWN && evt.altKey)) {
+        if(key === KEYS.ENTER || key === KEYS.SPACE || keyStr.length === 1) {
           self.open();
-
+          if(self.dropdown.$search && keyStr.length === 1) {
+            self.dropdown.$search.val(keyStr);
+          }
           evt.preventDefault();
         }
       }

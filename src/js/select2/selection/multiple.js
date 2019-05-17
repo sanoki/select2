@@ -1,8 +1,9 @@
 define([
   'jquery',
   './base',
-  '../utils'
-], function ($, BaseSelection, Utils) {
+  '../utils',
+  '../keys'
+], function ($, BaseSelection, Utils, KYES) {
   function MultipleSelection ($element, options) {
     MultipleSelection.__super__.constructor.apply(this, arguments);
   }
@@ -26,20 +27,17 @@ define([
 
     MultipleSelection.__super__.bind.apply(this, arguments);
 
-    this.$selection.on('keydown', function(evt) {
+    this.$selection.on('click', function(evt) {
       //Prevent blinking dropdown on items deleting
       if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice')) {
         return;
       }
-      self.trigger('toggle', {
+      self.trigger('open', {
         originalEvent: evt
       });
     });
 
-    this.$selection.on(
-      'click',
-      '.select2-selection__choice__remove',
-      function (evt) {
+    this.$selection.on('click', '.select2-selection__choice__remove', function (evt) {
         // Ignore the event if it is disabled
         if (self.options.get('disabled')) {
           return;
@@ -54,8 +52,25 @@ define([
           originalEvent: evt,
           data: data
         });
+    });
+
+    this.$selection.on('keydown', function(evt) {
+      var key = evt.which;
+
+      if(key === KEYS.BACKSPACE) {
+        var $previousChoice = $container.find('.select2-selection__choice').last();
+
+        if($previousChoice.length > 0) {
+          var item = Utils.GetData($previousChoice[0], 'data');
+
+          self.trigger('unselect', {
+            data: item
+          });
+
+          evt.preventDefault();
+        }
       }
-    );
+    });
   };
 
   MultipleSelection.prototype.clear = function () {

@@ -292,7 +292,9 @@ define([
     
     this.on('focus', function(evt) {
       self.$container.addClass('select2-container--focus');
-      self.open();
+      if(!evt.originalEvent) {
+        self.open();
+      }
     });
 
     this.on('open', function () {

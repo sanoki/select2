@@ -3,7 +3,7 @@ define([
   './base',
   '../utils',
   '../keys'
-], function ($, BaseSelection, Utils, KYES) {
+], function($, BaseSelection, Utils, KEYS) {
   function MultipleSelection ($element, options) {
     MultipleSelection.__super__.constructor.apply(this, arguments);
   }

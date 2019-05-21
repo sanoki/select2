@@ -1710,7 +1710,7 @@ S2.define('select2/selection/multiple',[
 
     this.$selection.on('click', function(evt) {
       //Prevent blinking dropdown on items deleting
-      if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice')) {
+      if(evt && evt.target && $(evt.target).parent().is('.select2-selection__choice__remove')) {
         return;
       }
       self.trigger('open', {
